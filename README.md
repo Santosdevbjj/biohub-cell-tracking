@@ -194,7 +194,74 @@ Toda a arquitetura foi projetada para operar:
 - Agradecimentos
 
 ---
-# Metodologia O desenvolvimento da solução segue uma abordagem modular inspirada em pipelines de Machine Learning utilizados em ambientes de produção. Em vez de um modelo único fim-a-fim, o problema é decomposto em etapas independentes, permitindo: - validação isolada de cada componente; - depuração mais simples; - substituição de módulos sem reescrever todo o pipeline; - maior auditabilidade; - melhor controle de consumo computacional. --- # Pipeline de Machine Learning O fluxo completo da solução é composto por seis estágios. ## 1. Ingestão dos dados Os volumes de microscopia são fornecidos no formato `.zarr`. Nesta etapa o pipeline: - lê os volumes 3D+t; - valida dimensões e metadados; - identifica escala física do voxel; - prepara os dados para processamento em blocos. ```text .zarr → Volume 4D (t, z, y, x) ``` --- ## 2. Pré-processamento Objetivos: - normalização de intensidade; - redução de ruído; - padronização espacial; - preparação para inferência. Esta etapa é executada localmente e não depende de acesso à internet. --- ## 3. Detecção celular Responsável por localizar células em cada timepoint. Saída: ```text (t, z, y, x) ``` A implementação inicial utiliza um detector calibrado para priorizar **precisão** sobre **recall absoluto**, alinhando-se à métrica oficial da competição, que penaliza excesso de nós previstos. --- ## 4. Linking temporal As detecções de frames consecutivos são associadas utilizando custo baseado em distância física. Características: - voxel anisotrópico; - custo em micrômetros; - assignment bipartido; - restrição temporal local. Saída: ```text célula_t → célula_t+1 ``` --- ## 5. Reconstrução de linhagem Nesta etapa o pipeline: - identifica divisões celulares; - cria nós-filhos; - monta o grafo completo de linhagem; - remove inconsistências estruturais. Uma divisão é representada quando um nó possui duas ou mais arestas de saída válidas. --- ## 6. Geração da submissão O resultado final é convertido para o formato exigido pelo Kaggle: ```text nodes + edges → submission.csv ``` --- # Diagrama Detalhado ```text Volumes .zarr │ ▼ ┌──────────────────────┐ │ Pré-processamento │ └──────────────────────┘ │ ▼ ┌──────────────────────┐ │ Detecção celular │ └──────────────────────┘ │ ▼ Centroides (t,z,y,x) │ ▼ ┌──────────────────────┐ │ Linking temporal │ └──────────────────────┘ │ ▼ Arestas candidatas │ ▼ ┌──────────────────────┐ │ Reconstrução │ │ de linhagem │ └──────────────────────┘ │ ▼ Grafo final │ ▼ submission.csv ``` --- # Decisões Técnicas ## Pipeline modular vs. modelo fim-a-fim **Escolha:** pipeline modular. ### Motivos - depuração simplificada; - troca de componentes; - melhor observabilidade; - menor acoplamento; - compatibilidade com ambientes regulados. ### Trade-off Possível perda de alguns ganhos que um modelo fim-a-fim poderia capturar. --- ## Offline-first **Escolha:** toda a inferência deve funcionar sem internet. ### Motivos - requisito da competição; - reprodutibilidade; - previsibilidade operacional. ### Trade-off Maior esforço de empacotamento de dependências e modelos. --- ## SLA de 12 horas **Escolha:** throughput é tratado como requisito funcional. ### Motivos Um pipeline que não termina dentro do prazo é inutilizável na competição. ### Trade-off Arquiteturas extremamente pesadas podem ser descartadas mesmo sendo potencialmente mais precisas. --- ## Uso do Ultrack como baseline **Escolha:** utilizar o método de referência publicado pelo grupo responsável pelo dataset. ### Motivos - benchmark sólido; - comparação justa; - foco em engenharia do pipeline. ### Trade-off Dependência de uma biblioteca externa. --- # Arquiteturas Avaliadas O projeto considera três famílias principais de modelos. | Arquitetura | Papel | Status | |-------------|--------|--------| | U-Net 3D | Detecção | Baseline | | GraphSAGE (GNN) | Linking/Linhagem | Pesquisa | | Transformer espaçotemporal | Refinamento temporal | Roadmap | No escopo inicial, o foco está em obter um pipeline completo, reproduzível e compatível com o SLA antes de introduzir componentes de maior custo computacional. --- # Estrutura do Repositório ```text biohub-cell-tracking/ ├── src/ ├── tests/ ├── configs/ ├── docs/ ├── notebooks/ ├── experiments/ ├── scripts/ ├── models/ └── assets/ ``` A documentação detalhada de arquitetura e decisões encontra-se em: - `docs/ARCHITECTURE.md` - `docs/DECISIONS.md` - `docs/ADR/` 
+ Metodologia O desenvolvimento da solução segue uma abordagem modular inspirada em pipelines de Machine Learning utilizados em ambientes de produção. Em vez de um modelo único fim-a-fim, o problema é decomposto em etapas independentes, permitindo: - validação isolada de cada componente; - depuração mais simples; - substituição de módulos sem reescrever todo o pipeline; - maior auditabilidade; - melhor controle de consumo computacional. --- 
+ 
+ ## Pipeline de Machine Learning O fluxo completo da solução é composto por seis estágios. ## 1. Ingestão dos dados Os volumes de microscopia são fornecidos no formato `.zarr`. Nesta etapa o pipeline: - lê os volumes 3D+t; - valida dimensões e metadados; - identifica escala física do voxel; - prepara os dados para processamento em blocos. ```text .zarr → Volume 4D (t, z, y, x) ``` 
+ 
+ --- 
+ 
+ ## 2. Pré-processamento Objetivos: - normalização de intensidade; - redução de ruído; - padronização espacial; - preparação para inferência. Esta etapa é executada localmente e não depende de acesso à internet.
+ 
+ ---
+ 
+ ## 3. Detecção celular Responsável por localizar células em cada timepoint. Saída: ```text (t, z, y, x) ``` A implementação inicial utiliza um detector calibrado para priorizar **precisão** sobre **recall absoluto**, alinhando-se à métrica oficial da competição, que penaliza excesso de nós previstos.
+ 
+ --- 
+ 
+ ## 4. Linking temporal As detecções de frames consecutivos são associadas utilizando custo baseado em distância física. Características: - voxel anisotrópico; - custo em micrômetros; - assignment bipartido; - restrição temporal local. Saída: ```text célula_t → célula_t+1 ```
+ 
+ --- 
+ 
+ ## 5. Reconstrução de linhagem Nesta etapa o pipeline: - identifica divisões celulares; - cria nós-filhos; - monta o grafo completo de linhagem; - remove inconsistências estruturais. Uma divisão é representada quando um nó possui duas ou mais arestas de saída válidas.
+ 
+ --- 
+ 
+ ## 6. Geração da submissão O resultado final é convertido para o formato exigido pelo Kaggle: 
+ 
+ ```text nodes + edges → submission.csv ``` 
+ 
+ ---
+ 
+ # Diagrama Detalhado 
+ 
+ ```text Volumes .zarr │ ▼ ┌──────────────────────┐ │ Pré-processamento │ └──────────────────────┘ │ ▼ ┌──────────────────────┐ │ Detecção celular │ └──────────────────────┘ │ ▼ Centroides (t,z,y,x) │ ▼ ┌──────────────────────┐ │ Linking temporal │ └──────────────────────┘ │ ▼ Arestas candidatas │ ▼ ┌──────────────────────┐ │ Reconstrução │ │ de linhagem │ └──────────────────────┘ │ ▼ Grafo final │ ▼ submission.csv 
+ 
+ ```
+
+ 
+ --- 
+ 
+ # Decisões Técnicas
+
+ ## Pipeline modular vs. modelo fim-a-fim **Escolha:** pipeline modular.
+
+### Motivos - depuração simplificada; - troca de componentes; - melhor observabilidade; - menor acoplamento; - compatibilidade com ambientes regulados.
+
+### Trade-off Possível perda de alguns ganhos que um modelo fim-a-fim poderia capturar. ---
+
+## Offline-first **Escolha:** toda a inferência deve funcionar sem internet.
+
+ ### Motivos - requisito da competição; - reprodutibilidade; - previsibilidade operacional.
+
+### Trade-off Maior esforço de empacotamento de dependências e modelos.
+
+---
+
+## SLA de 12 horas **Escolha:** throughput é tratado como requisito funcional.
+
+### Motivos Um pipeline que não termina dentro do prazo é inutilizável na competição. ### Trade-off Arquiteturas extremamente pesadas podem ser descartadas mesmo sendo potencialmente mais precisas.
+
+---
+
+## Uso do Ultrack como baseline **Escolha:** utilizar o método de referência publicado pelo grupo responsável pelo dataset. ### Motivos - benchmark sólido; - comparação justa; - foco em engenharia do pipeline.
+
+### Trade-off Dependência de uma biblioteca externa
+
+---
+
+ # Arquiteturas Avaliadas O projeto considera
+
+três famílias principais de modelos. | Arquitetura | Papel | Status | |-------------|--------|--------| | U-Net 3D | Detecção | Baseline | | GraphSAGE (GNN) | Linking/Linhagem | Pesquisa | | Transformer espaçotemporal | Refinamento temporal | Roadmap | No escopo inicial, o foco está em obter um pipeline completo, reproduzível e compatível com o SLA antes de introduzir componentes de maior custo computacional. --- # Estrutura do Repositório ```text biohub-cell-tracking/ ├── src/ ├── tests/ ├── configs/ ├── docs/ ├── notebooks/ ├── experiments/ ├── scripts/ ├── models/ └── assets/ ``` A documentação detalhada de arquitetura e decisões encontra-se em: - `docs/ARCHITECTURE.md` - `docs/DECISIONS.md` - `docs/ADR/` 
 
 
 ---
