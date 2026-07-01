@@ -194,13 +194,39 @@ Toda a arquitetura foi projetada para operar:
 - Agradecimentos
 
 ---
- Metodologia O desenvolvimento da solução segue uma abordagem modular inspirada em pipelines de Machine Learning utilizados em ambientes de produção. Em vez de um modelo único fim-a-fim, o problema é decomposto em etapas independentes, permitindo: - validação isolada de cada componente; - depuração mais simples; - substituição de módulos sem reescrever todo o pipeline; - maior auditabilidade; - melhor controle de consumo computacional. --- 
+
+ ## Metodologia 
  
- ## Pipeline de Machine Learning O fluxo completo da solução é composto por seis estágios. ## 1. Ingestão dos dados Os volumes de microscopia são fornecidos no formato `.zarr`. Nesta etapa o pipeline: - lê os volumes 3D+t; - valida dimensões e metadados; - identifica escala física do voxel; - prepara os dados para processamento em blocos. ```text .zarr → Volume 4D (t, z, y, x) ``` 
+ O desenvolvimento da solução segue uma abordagem modular inspirada em pipelines de Machine Learning utilizados em ambientes de produção.
+ 
+ Em vez de um modelo único fim-a-fim, o problema é decomposto em etapas independentes, permitindo: 
+ 
+ - validação isolada de cada componente; - depuração mais simples;
+ 
+ 
+ -    substituição de módulos sem reescrever todo o pipeline;
+ 
+    - maior auditabilidade;
+    
+    - melhor controle de consumo computacional. 
  
  --- 
  
- ## 2. Pré-processamento Objetivos: - normalização de intensidade; - redução de ruído; - padronização espacial; - preparação para inferência. Esta etapa é executada localmente e não depende de acesso à internet.
+ ## Pipeline de Machine Learning O fluxo completo da solução é composto por seis estágios. 
+ 
+ ## 1. Ingestão dos dados Os volumes de microscopia são fornecidos no formato `.zarr`. Nesta etapa o pipeline: 
+ 
+ - lê os volumes 3D+t; - valida dimensões e metadados; - identifica escala física do voxel; 
+ 
+ - prepara os dados para processamento em blocos. 
+ 
+ ```text .zarr → Volume 4D (t, z, y, x) ``` 
+ 
+ --- 
+ 
+ ## 2. Pré-processamento Objetivos: - normalização de intensidade; - redução de ruído; - padronização espacial;
+ 
+ - preparação para inferência. Esta etapa é executada localmente e não depende de acesso à internet.
  
  ---
  
